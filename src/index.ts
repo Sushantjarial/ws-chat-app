@@ -36,15 +36,20 @@ wss.on("connection",(socket)=>{
         }
 
         if(data.type==="chat"){
-            clients.forEach((user)=>{
-                if(user.roomid===data.roomid && user.name!==data.name){
-                user.socket.send(JSON.stringify({
-                    name:data.name,
-                    message:data.message
-                }))
-                }
-            })
+     const user = clients.find((user)=>{
+         return user.socket==socket
+          })
+      
+          clients.forEach((client)=>{
+            if(client.roomid==user?.roomid){
+                client.socket.send(data.message)
+            }
+          })
+
+
         }
+
+      
     }
     catch(e){
     socket.send("error"+e)
