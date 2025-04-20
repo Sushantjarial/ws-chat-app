@@ -1,14 +1,14 @@
 import express from "express";
-import {middleware} from "./middlewares"
 import {JWT_SECRET} from "@repo/common-backend/config"
 import {prisma} from "@repo/db/client"
-import {Request, Response} from "express"
-import {createRoomSchema, signupSchema} from "@repo/common/types"
+import {createRoomSchema} from "@repo/common/types"
 import jwt from "jsonwebtoken"
+import cors from "cors"
 
 
 const app = express();
 app.use(express.json())
+app.use(cors())
 
 // app.post("/signup",async(req,res)=>{
     
@@ -199,8 +199,30 @@ app.get("/rooms/:slug",async(req,res)=>{
         })
     }
 })
+app.get("/rooms",async(req,res)=>{
+try{
+    const rooms=await prisma.room.findMany({
+        select:{
+            id:true,
+            slug:true,
+            adminId:true,
+            createdAt:true,
+        }
+    })
+    res.status(200).json({
+        rooms
+    })
+}
+catch(e){
+    res.status(500).json({
+        message:"database is offline",
+        error:e
+    })
+}
+})
 
 
-app.listen(4000);
+app.listen(8000);
+
 
 
