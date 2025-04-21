@@ -105,11 +105,13 @@ app.use(cors())
 app.post("/createRoom",async(req,res)=>{
     const {success,error}=createRoomSchema.safeParse(req.body)
     if(success){
+        const roomToken=jwt.sign({roomId :req.body.slug},JWT_SECRET)
         try{
             const room=await prisma.room.create({
                 data:{
                     slug:req.body.slug,
-                    adminId:req.body.adminId
+                    adminId:req.body.adminId,
+                    roomToken:roomToken
                     
                 }
             })
@@ -119,12 +121,11 @@ app.post("/createRoom",async(req,res)=>{
                 })
             }
             else{
-                const room_id=room.id.toString()
-                const roomToken=jwt.sign({roomId :room_id},JWT_SECRET)
+                
                 res.status(200).json({
                     message:"room created successfully",
-                    room,
-                    roomToken
+                    room
+
                 })
             }
         }
@@ -182,13 +183,10 @@ app.get("/rooms/:slug",async(req,res)=>{
             })
         }
         else{
-            const room_id=room.id
-            const roomToken=jwt.sign({roomId :room_id},JWT_SECRET)
-
+           
             res.status(200).json({
                 message:"room found",
-                room,
-                roomToken
+                room
             })
         }
     }
@@ -206,6 +204,7 @@ try{
             id:true,
             slug:true,
             adminId:true,
+            roomToken:true,
             createdAt:true,
         }
     })

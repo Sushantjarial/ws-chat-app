@@ -41,10 +41,17 @@ export default function Home() {
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault()
     setUserId( localStorage.getItem("userId") || "")
+    const room=userRooms.find((room:any)=>room.slug===roomId) as  any 
+    if(!room){
+      setError("Room does not exist")
 
+      console.log("Room does not exist")
+      return
+    }
+    console.log(room)
 
     if (roomId && username) {
-      router.push(`/room/${roomId}?username=${encodeURIComponent(username)}`)
+    router.push(`/room/${roomId}?userName=${encodeURIComponent(username)}&roomToken=${encodeURIComponent(room.roomToken)}`)
     }
   }
 
@@ -81,6 +88,10 @@ export default function Home() {
       setError("Room name must be at least 3 characters")
       return
     }
+    if(userRooms.find((room:any)=>room.slug===slug)){
+      setError("Room already exists")
+      return
+    }
     console.log("check5")
 
     try{
@@ -97,7 +108,7 @@ export default function Home() {
         return
       }
       else{
-        router.push(`/room/${slug}?username=${encodeURIComponent(username)}`)
+        router.push(`/room/${slug}?userName=${encodeURIComponent(username)}?roomToken=${res.data.room.roomToken}`) 
       }
     })
   }

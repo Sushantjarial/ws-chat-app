@@ -11,8 +11,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Send, ArrowLeft, Copy, CheckCheck, Users } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
-import type { Message } from "@/types/chat"
+import type { Message, SendMessage } from "@/types/chat"
 import { generateRandomColor } from "@/lib/utils"
+import { set } from "react-hook-form"
 
 export default function ChatRoom() {
   const params = useParams()
@@ -20,8 +21,13 @@ export default function ChatRoom() {
   const router = useRouter()
   const isMobile = useMobile()
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const roomId = params.id as string
-  const username = searchParams.get("username") || "Anonymous"
+  const slug = params.slug as string
+  const userName = searchParams.get("userName") || "Anonymous"
+  const roomToken = searchParams.get("roomToken") || ""
+
+  const [isConnected, setIsConnected] = useState(false)
+  const socketRef = useRef<WebSocket | null>(null)
+
 
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
@@ -29,9 +35,8 @@ export default function ChatRoom() {
   const [copied, setCopied] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
 
-  // Mock participants - in a real app, this would come from a backend
   const participants = [
-    { name: username, online: true },
+    { name: userName, online: true },
     { name: "Alex", online: true },
     { name: "Taylor", online: false },
     { name: "Jordan", online: true },
@@ -39,77 +44,90 @@ export default function ChatRoom() {
 
   // Get or set user color
   useEffect(() => {
-    if (!userColors[username]) {
+    if (!userColors[userName]) {
       setUserColors((prev) => ({
         ...prev,
-        [username]: generateRandomColor(),
+        [userName]: generateRandomColor(),
         Alex: generateRandomColor(),
         Taylor: generateRandomColor(),
         Jordan: generateRandomColor(),
       }))
     }
-  }, [username, userColors])
+  }, [userName, userColors])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Mock initial messages - in a real app, these would be fetched from a backend
   useEffect(() => {
-    const initialMessages: Message[] = [
-      {
-        id: "1",
-        content: `Welcome to room ${roomId}!`,
-        sender: "System",
-        timestamp: new Date().toISOString(),
-        isSystem: true,
-      },
-      {
-        id: "2",
-        content: "Hey everyone! How's it going?",
-        sender: "Alex",
-        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-        isSystem: false,
-      },
-      {
-        id: "3",
-        content: "Just joined this new chat app. The UI looks amazing!",
-        sender: "Taylor",
-        timestamp: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
-        isSystem: false,
-      },
-      {
-        id: "4",
-        content: "I agree! The design is so elegant and refined.",
-        sender: "Jordan",
-        timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-        isSystem: false,
-      },
-    ]
+    const userId = localStorage.getItem("userId") || ""
 
-    setTimeout(() => {
-      setMessages(initialMessages)
-    }, 1000)
-  }, [roomId])
+    console.log("Room token:", roomToken)
+    const ws = new WebSocket("ws://localhost:8080")
+
+    socketRef.current = ws
+
+    ws.onopen = () => {
+      console.log(" WebSocket  connected")
+
+      ws.send(
+        JSON.stringify({
+          type: "join",
+          userId: userId,
+          userName,
+          roomToken,
+        }),
+      )
+    }
+
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.type === "message") {
+        setMessages((prev) => [...prev, data])
+      } 
+      console.log("Message from server:", data)
+    }
+
+
+    ws.onclose = () => {
+      console.log("🔌 WebSocket closed");
+    };
+
+
+    return () => {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) socketRef.current.send(
+        JSON.stringify({
+          type: "leave",
+          userId: userId,
+          userName,
+          roomToken,
+        })
+      );
+      if (socketRef.current) socketRef.current.close(); // Cleanup on unmount
+    };
+  }, [])
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault()
     if (message.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        content: message,
-        sender: username,
-        timestamp: new Date().toISOString(),
-        isSystem: false,
+      const newMessage: SendMessage = {
+        data: message,
+       userName: userName,
+        type: "message",
+        roomToken: roomToken,
+        userId: localStorage.getItem("userId") || "",
       }
-      setMessages((prev) => [...prev, newMessage])
+      socketRef.current?.send(JSON.stringify(newMessage))
+
+
       setMessage("")
     }
   }
 
   const copyRoomId = () => {
-    navigator.clipboard.writeText(roomId)
+    navigator.clipboard.writeText(slug)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -124,7 +142,7 @@ export default function ChatRoom() {
   }
 
   const getInitials = (name: string) => {
-    return name.substring(0, 2).toUpperCase()
+    return name?.substring(0, 2).toUpperCase()
   }
 
   // Update the return statement with enhanced UI
@@ -179,9 +197,9 @@ export default function ChatRoom() {
           </Button>
           <div>
             <h1 className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-teal-300/90 to-indigo-300/90">
-              {roomId}
+              {slug}
             </h1>
-            <p className="text-xs text-gray-400">Logged in as {username}</p>
+            <p className="text-xs text-gray-400">Logged in as {userName}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -231,7 +249,7 @@ export default function ChatRoom() {
             <AnimatePresence>
               {messages.map((msg, index) => (
                 <motion.div
-                  key={msg.id}
+                  key={index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
@@ -239,34 +257,33 @@ export default function ChatRoom() {
                     delay: index * 0.1,
                     ease: "easeOut",
                   }}
-                  className={`flex ${msg.sender === username ? "justify-end" : "justify-start"} ${msg.isSystem ? "justify-center" : ""}`}
+                  className={`flex ${msg.sender === userName ? "justify-end" : "justify-start"} ${msg.isSystem ? "justify-center" : ""}`}
                 >
                   {msg.isSystem ? (
                     <div className="bg-gray-800/30 backdrop-blur-sm text-gray-400 rounded-lg px-4 py-2 text-sm max-w-[80%] border border-gray-700/30">
-                      {msg.content}
+                      {msg.message}
                     </div>
                   ) : (
                     <div
-                      className={`flex ${msg.sender === username ? "flex-row-reverse" : "flex-row"} items-end gap-2 max-w-[80%]`}
+                      className={`flex ${msg.sender === userName ? "flex-row-reverse" : "flex-row"} items-end gap-2 max-w-[80%]`}
                     >
                       <Avatar className="w-8 h-8 border border-gray-700/30">
                         <AvatarFallback style={{ backgroundColor: userColors[msg.sender] || "#4B5563" }}>
                           {getInitials(msg.sender)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className={`flex flex-col ${msg.sender === username ? "items-end" : "items-start"}`}>
+                      <div className={`flex flex-col ${msg.sender === userName ? "items-end" : "items-start"}`}>
                         <div
-                          className={`px-4 py-2 rounded-2xl backdrop-blur-sm ${
-                            msg.sender === username
+                          className={`px-4 py-2 rounded-2xl backdrop-blur-sm ${msg.sender === userName
                               ? "bg-gradient-to-r from-teal-800/60 to-teal-900/60 text-white rounded-br-none border border-teal-700/20"
                               : "bg-gray-800/40 text-white rounded-bl-none border border-gray-700/30"
-                          }`}
+                            }`}
                         >
-                          {msg.content}
+                          {msg.message}
                         </div>
                         <div className="flex items-center mt-1 text-xs text-gray-500">
                           <span className="mr-1">{msg.sender}</span>
-                          <span>{formatTime(msg.timestamp)}</span>
+                          {/* <span>{formatTime(msg.timestamp)}</span>` */}
                         </div>
                       </div>
                     </div>
