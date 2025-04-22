@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
@@ -10,27 +10,46 @@ import { BackgroundBeams } from "@/components/ui/background-beam"
 import axios from "axios"
 import { Navbar } from "@/components/ui/navbar"
 
+import { useToast } from "@/components/ui/use-toast";
+
 // Dummy rooms data
 const dummyRooms = [
-  { id: "1", name: "General Chat", slug: "general-chat", members: 5 },
-  { id: "2", name: "Team Meeting", slug: "team-meeting", members: 3 },
-  { id: "3", name: "Project Discussion", slug: "project-discussion", members: 4 },
-  { id: "4", name: "Random Chat", slug: "random-chat", members: 2 },
+  { id: "1", name: "General Chat (dummy room)", slug: "general-chat", members: 5 },
+  { id: "2", name: "Team Meeting(dummy room)", slug: "team-meeting", members: 3 },
+  { id: "3", name: "Project Discussion(dummy room)", slug: "project-discussion", members: 4 },
+  { id: "4", name: "Random Chat (dummy room)", slug: "random-chat", members: 2 },
 ]
 
 export default function UserRooms() {
+  const { toast } = useToast()
   const router = useRouter()
   const [userRooms, setUserRooms] = useState(dummyRooms)
   const [userId, setUserId] = useState("")
 
   useEffect(() => {
     const userId = localStorage.getItem("userId")
+
+
     if (!userId) {
       router.push("/")
       return
     }
     setUserId(userId)
-  }, [router])
+    const res=axios.get(`http://localhost:8000/rooms?userId=${userId}`)
+    res.then((res)=>{
+      console.log(res.data.rooms)
+      if(res.data.rooms.length===0){
+        setUserRooms(dummyRooms)
+    alert("No rooms found for this user")
+
+      }
+      else{
+        setUserRooms(res.data.rooms)
+      }
+    })
+
+
+  }, [])
 
   const handleDeleteRoom = (roomId: string) => {
     // In a real app, you would make an API call here

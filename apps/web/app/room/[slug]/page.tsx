@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Send, ArrowLeft, Copy, CheckCheck, Users } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
-import type { Message, SendMessage } from "@/types/chat"
+import type { Message, Participant, SendMessage } from "@/types/chat"
 import { generateRandomColor } from "@/lib/utils"
 import { set } from "react-hook-form"
 
@@ -24,7 +24,7 @@ export default function ChatRoom() {
   const slug = params.slug as string
   const userName = searchParams.get("userName") || "Anonymous"
   const roomToken = searchParams.get("roomToken") || ""
-
+  const [participants,setParticipants]=useState<string[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
 
@@ -35,12 +35,7 @@ export default function ChatRoom() {
   const [copied, setCopied] = useState(false)
   const [showParticipants, setShowParticipants] = useState(false)
 
-  const participants = [
-    { name: userName, online: true },
-    { name: "Alex", online: true },
-    { name: "Taylor", online: false },
-    { name: "Jordan", online: true },
-  ]
+
 
   // Get or set user color
   useEffect(() => {
@@ -87,24 +82,41 @@ export default function ChatRoom() {
       if (data.type === "message") {
         setMessages((prev) => [...prev, data])
       } 
+      console.log(data,"dataaaaa")
+      if(data.participants){
+       setParticipants(data.participants)
+      }
+      
       console.log("Message from server:", data)
+
     }
 
 
     ws.onclose = () => {
       console.log("🔌 WebSocket closed");
-    };
-
-
-    return () => {
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) socketRef.current.send(
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {socketRef.current.send(
         JSON.stringify({
           type: "leave",
           userId: userId,
           userName,
           roomToken,
         })
-      );
+        
+      );}
+    };
+
+
+    return () => {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {socketRef.current.send(
+        JSON.stringify({
+          type: "leave",
+          userId: userId,
+          userName,
+          roomToken,
+        })
+        
+      );}
+      console.log("WebSocket connection closed")
       if (socketRef.current) socketRef.current.close(); // Cleanup on unmount
     };
   }, [])
@@ -347,24 +359,24 @@ export default function ChatRoom() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  {participants.map((participant) => (
+                  {participants?.map((participant,index) => (
                     <motion.div
-                      key={participant.name}
+                      key={index}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3 }}
                       className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800/30"
                     >
                       <Avatar className="w-8 h-8 border border-gray-700/30">
-                        <AvatarFallback style={{ backgroundColor: userColors[participant.name] || "#4B5563" }}>
-                          {getInitials(participant.name)}
+                        <AvatarFallback style={{ backgroundColor: userColors[participant] || "#4B5563" }}>
+                          {getInitials(participant)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{participant.name}</p>
+                        <p className="text-sm font-medium truncate">{participant}</p>
                       </div>
                       <div
-                        className={`w-2 h-2 rounded-full ${participant.online ? "bg-teal-500/80" : "bg-gray-500"}`}
+                        className={`w-2 h-2 rounded-full  bg-teal-500/80`}
                       />
                     </motion.div>
                   ))}

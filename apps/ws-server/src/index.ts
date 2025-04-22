@@ -12,6 +12,8 @@ type user = {
 }
 const users: Map<string, user> = new Map()
 
+const  rooms =new Map<string,user[]>()
+
 function verifyRoom(roomToken: string): string | null {
 
     try {
@@ -40,7 +42,7 @@ function verifyRoom(roomToken: string): string | null {
 
 
 wss.on("connection", (socket, request) => {
-
+    console.log(users,"connected")
     socket.send(JSON.stringify({
         type: "connection",
         message: "connected to server"
@@ -53,6 +55,16 @@ wss.on("connection", (socket, request) => {
                
             }
         })
+        rooms.forEach((user)=>{
+            user.forEach((user)=>{
+                if(user.socket===socket){
+                    user.rooms.forEach((roomId)=>{
+                        rooms.set(roomId,rooms.get(roomId)?.filter((x)=>x.userId!=user.userId) || [])
+                    })
+                }
+            })
+        })
+
     })
 
 
@@ -67,29 +79,39 @@ wss.on("connection", (socket, request) => {
             return
         }
         if (type === "join") {
-            const user = users.get(userId)
+            let user = users.get(userId) as user
+
             if (user) {
                 return
             }
-            users.set(userId, {
+            user={
                 socket,
                 userId,
                 rooms: [roomId],
                 userName
-            })
+            }
+
+         const newUser=   users.set(userId, user)
+              rooms.set(roomId,[...rooms.get(roomId)||[] ,user])
+
+
             users.forEach((user) => {
-                if (user.rooms.includes(roomId) && user.userId !== userId) {
+                if (user.rooms.includes(roomId)) {
                     user.socket.send(JSON.stringify({
                         type: "joined",
                         message: userName + " have joined the room",
                         sender: userName,
                         isSystem: true,
-
+                        participants: rooms.get(roomId)?.map((user)=>{
+                            return user.userName
+                        }),
                         roomId,
                     }))
                 }
             })
         }
+
+        
 
 
         if (type === "message") {
@@ -128,6 +150,9 @@ wss.on("connection", (socket, request) => {
                             sender: userName,
                             roomId,
                             isSystem: false,
+                            participants: rooms.get(roomId)?.map((user)=>{
+                                return user.userName
+                            })
                         }))
 
                     }
@@ -145,7 +170,25 @@ wss.on("connection", (socket, request) => {
                 return
             }
             else {
+                console.log(users,"leave")
                 users.delete(userId)
+                users.forEach((user)=>{
+                    if (user.rooms.includes(roomId)) {
+                        user.socket.send(JSON.stringify({
+                            type: "left",
+                            message: userName + " have left the room",
+                            sender: userName,
+                            isSystem: true,
+                            participants: rooms.get(roomId)?.map((user)=>{
+                                return user.userName
+                            }),
+                            roomId,
+                        }))
+                    }
+                })
+              
+                rooms.set(roomId,rooms.get(roomId)?.filter((user)=>user.userId!=userId) || [])
+                
             }
         }
 

@@ -4,11 +4,12 @@ export interface Message {
   sender: string
   roomId: string
   isSystem?: boolean
+  participants?: string[]
 }
 
 export interface Participant {
-  name: string
-  online: boolean
+  userName: string
+  online?: boolean
 }
 
 export interface SendMessage {
@@ -17,4 +18,5 @@ export interface SendMessage {
   userName: string
   roomToken: string
   userId: string
+
 }

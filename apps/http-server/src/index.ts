@@ -1,3 +1,6 @@
+
+
+
 import express from "express";
 import {JWT_SECRET} from "@repo/common-backend/config"
 import {prisma} from "@repo/db/client"
@@ -199,6 +202,8 @@ app.get("/rooms/:slug",async(req,res)=>{
 })
 app.get("/rooms",async(req,res)=>{
 try{
+    const userId=req.query.userId as string
+    console.log(userId)
     const rooms=await prisma.room.findMany({
         select:{
             id:true,
@@ -206,8 +211,12 @@ try{
             adminId:true,
             roomToken:true,
             createdAt:true,
+        },
+        where:{
+            adminId:userId
         }
     })
+    console.log(rooms)
     res.status(200).json({
         rooms
     })
